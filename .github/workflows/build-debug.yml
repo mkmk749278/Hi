@@ -1,0 +1,84 @@
+name: Build Debug APK
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'claude/**'   # build feature branches created by the AI builder
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:   # Allow manual trigger from GitHub Actions UI
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true   # Cancel old run if new push comes in
+
+jobs:
+  build-debug:
+    name: Build & Upload Debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Java 17 (required by AGP 8.x + KSP) ──────────────────────────────
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle        # Built-in Gradle cache in setup-java
+
+      # ── 3. Gradle wrapper cache (speeds up subsequent runs) ──────────────────
+      - name: Cache Gradle caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.android/build-cache
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties', '**/libs.versions.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # ── 4. Make Gradle wrapper executable ────────────────────────────────────
+      - name: Grant Gradle execute permission
+        run: chmod +x ./gradlew
+
+      # ── 5. Build (AIDL + KSP + Room + Hilt all handled by Gradle) ────────────
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace --no-daemon
+        env:
+          GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.daemon=false -Dkotlin.incremental=false"
+
+      # ── 6. Run unit tests (if any exist) ─────────────────────────────────────
+      - name: Run Unit Tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+        continue-on-error: true   # Don't fail build if no tests yet
+
+      # ── 7. Upload APK as artifact (downloadable from Actions tab) ────────────
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: 360-Launcher-Debug-${{ github.run_number }}-${{ github.sha }}
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14     # Keep for 2 weeks
+          if-no-files-found: error
+
+      # ── 8. Print APK info to logs ─────────────────────────────────────────────
+      - name: APK Info
+        run: |
+          echo "══════════════════════════════════════"
+          echo " BUILD COMPLETE"
+          echo "══════════════════════════════════════"
+          ls -lh app/build/outputs/apk/debug/
+          echo ""
+          echo "SHA: ${{ github.sha }}"
+          echo "Run: #${{ github.run_number }}"
+          echo "Branch: ${{ github.ref_name }}"
