@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer ring (the "O" / 360 sweep) -->
+    <path
+        android:strokeColor="#2ECC71"
+        android:strokeWidth="7"
+        android:fillColor="#00000000"
+        android:strokeLineCap="round"
+        android:pathData="M54,32
+            a22,22 0 1 1 -15.5,6.4" />
+    <!-- Sweep arrow head -->
+    <path
+        android:fillColor="#2ECC71"
+        android:pathData="M36,30 l6.5,10 l-11.5,1 z" />
+    <!-- Inner dot -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,50 m-6,0 a6,6 0 1 0 12,0 a6,6 0 1 0 -12,0" />
+</vector>

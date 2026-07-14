@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">360 Launcher</string>
+    <string name="search_apps">Search apps…</string>
+    <string name="hidden_apps">Hidden Apps</string>
+    <string name="focus_mode">Focus Mode</string>
+    <string name="icon_packs">Icon Packs</string>
+    <string name="no_apps_found">No apps found</string>
+    <string name="battery_opt_title">Allow 360 Launcher to run always</string>
+    <string name="battery_opt_message">Tap OK, then select "Don\'t optimize" to prevent HyperOS from killing your home screen.</string>
+</resources>
