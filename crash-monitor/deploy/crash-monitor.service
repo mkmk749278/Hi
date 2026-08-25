@@ -10,6 +10,9 @@ User=crashmon
 Group=crashmon
 WorkingDirectory=/opt/crash-monitor
 Environment=CRASHMON_DB=/var/lib/crash-monitor/crash.sqlite3
+# python -m would otherwise resolve the package from WorkingDirectory alone;
+# naming it explicitly keeps the unit correct if that ever changes.
+Environment=PYTHONPATH=/opt/crash-monitor
 ExecStart=/opt/crash-monitor/venv/bin/python -m crashmon.collector
 Restart=always
 RestartSec=10s

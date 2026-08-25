@@ -90,11 +90,25 @@ fi
 chown -R crashmon:crashmon "$APP_DIR" "$DATA_DIR"
 
 echo "==> verifying the live chain before enabling the service"
-if ! sudo -u crashmon "$APP_DIR/venv/bin/python" -m crashmon.collector --selftest; then
+# python -m resolves packages from the current directory, which here is the
+# checkout rather than $APP_DIR - and the service user cannot read it anyway.
+# Name the location explicitly instead of depending on where this was invoked.
+if ! sudo -u crashmon env PYTHONPATH="$APP_DIR" \
+        "$APP_DIR/venv/bin/python" -m crashmon.collector --selftest; then
     echo "error: selftest failed — not enabling the service." >&2
     echo "       the endpoints may have moved; see README troubleshooting." >&2
     exit 1
 fi
+
+echo "==> installing crashmon-report helper"
+cat > /usr/local/bin/crashmon-report <<WRAPPER
+#!/bin/sh
+# Report on the collected rounds. Extra arguments pass through to the module,
+# e.g. crashmon-report --json  or  crashmon-report --thresholds 2,5,50
+exec env PYTHONPATH="$APP_DIR" "$APP_DIR/venv/bin/python" -m crashmon.analyze \\
+    --db "$DATA_DIR/crash.sqlite3" "\$@"
+WRAPPER
+chmod 0755 /usr/local/bin/crashmon-report
 
 echo "==> installing systemd unit"
 install -m 0644 "$SRC_DIR/deploy/$SERVICE.service" "/etc/systemd/system/$SERVICE.service"
@@ -111,7 +125,7 @@ Installed.
 
   logs      journalctl -u $SERVICE -f
   database  $DATA_DIR/crash.sqlite3
-  report    $APP_DIR/venv/bin/python -m crashmon.analyze --db $DATA_DIR/crash.sqlite3
+  report    crashmon-report
 
 At roughly 20s per round expect about 4,300 rounds a day; a day is already
 enough to pin the below-2x rate to well under a percentage point.
