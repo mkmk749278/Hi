@@ -16,6 +16,47 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
+# Debian and Ubuntu ship python3 without ensurepip, so `python3 -m venv` fails
+# with "ensurepip is not available" until the matching venv package is present.
+ensure_venv_support() {
+    if python3 -c "import ensurepip" >/dev/null 2>&1; then
+        return 0
+    fi
+    echo "==> python3-venv is missing (ensurepip unavailable)"
+    if ! command -v apt-get >/dev/null 2>&1; then
+        echo "error: install your distribution's python3 venv package, then re-run." >&2
+        exit 1
+    fi
+    # The generic package does not exist on every release; the versioned one
+    # (python3.12-venv and friends) is the reliable fallback.
+    local pyver
+    pyver="$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+    apt-get update -qq
+    for pkg in "python${pyver}-venv" python3-venv; do
+        echo "    trying apt-get install $pkg"
+        if apt-get install -y -qq "$pkg" >/dev/null 2>&1; then
+            if python3 -c "import ensurepip" >/dev/null 2>&1; then
+                echo "    installed $pkg"
+                return 0
+            fi
+        fi
+    done
+    echo "error: could not install a working python3 venv package." >&2
+    echo "       try manually:  apt install python${pyver}-venv" >&2
+    exit 1
+}
+
+echo "==> checking prerequisites"
+missing=()
+command -v python3 >/dev/null 2>&1 || missing+=("python3")
+command -v useradd >/dev/null 2>&1 || missing+=("useradd (passwd package)")
+command -v systemctl >/dev/null 2>&1 || missing+=("systemctl (systemd)")
+if (( ${#missing[@]} )); then
+    echo "error: missing prerequisites: ${missing[*]}" >&2
+    exit 1
+fi
+ensure_venv_support
+
 echo "==> creating service user and directories"
 id -u crashmon >/dev/null 2>&1 || useradd --system --home "$APP_DIR" --shell /usr/sbin/nologin crashmon
 mkdir -p "$APP_DIR" "$DATA_DIR"
@@ -28,7 +69,10 @@ cp "$SRC_DIR/requirements.txt" "$APP_DIR/"
 
 echo "==> creating virtualenv"
 if [[ ! -x "$APP_DIR/venv/bin/python" ]]; then
-    python3 -m venv "$APP_DIR/venv"
+    if ! python3 -m venv "$APP_DIR/venv"; then
+        echo "error: virtualenv creation failed. Remove $APP_DIR/venv and re-run." >&2
+        exit 1
+    fi
 fi
 "$APP_DIR/venv/bin/pip" install --quiet --upgrade pip
 "$APP_DIR/venv/bin/pip" install --quiet -r "$APP_DIR/requirements.txt"

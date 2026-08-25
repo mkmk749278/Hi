@@ -46,6 +46,11 @@ stream delivers every round exactly once, so the sample is unbiased.
 
 ## Install
 
+Requires Python 3.9+, systemd, and a working `venv`. On Debian and Ubuntu the
+stock `python3` ships without `ensurepip`, so `venv` creation fails until
+`python3-venv` is present — the installer detects this and installs the right
+package for your Python version itself.
+
 On the VPS, as root:
 
 ```bash
