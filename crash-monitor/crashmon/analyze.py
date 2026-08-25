@@ -34,6 +34,10 @@ from . import db
 DEFAULT_THRESHOLDS = [1.2, 1.5, 2.0, 3.0, 5.0, 10.0, 20.0, 50.0, 100.0]
 PUBLISHED_RTP = 0.97
 
+# Below this many rounds the interval on c is too wide to say anything useful,
+# so the report says so rather than letting a stray point estimate be quoted.
+MIN_USEFUL_ROUNDS = 1000
+
 
 # -- small statistics helpers (stdlib only) --------------------------------
 
@@ -196,6 +200,13 @@ def render(result: dict) -> str:
     lines.append(f"  lowest observed   : {result['min']:.2f}x  "
                  f"({result['at_min']:,} rounds, {result['at_min']/n:.2%})")
 
+    if n < MIN_USEFUL_ROUNDS:
+        head("Small sample")
+        lines.append(f"  Only {n:,} rounds. The edge estimate below is not yet")
+        lines.append(f"  meaningful — read the confidence interval, not the point")
+        lines.append(f"  estimate, until you have at least {MIN_USEFUL_ROUNDS:,} rounds")
+        lines.append(f"  (about {MIN_USEFUL_ROUNDS * 20 / 3600:.0f} hours of collection).")
+
     head("Fairness verification")
     bad = result["verified_bad"]
     lines.append(f"  hash verified     : {result['verified_ok']:,}")
@@ -226,7 +237,8 @@ def render(result: dict) -> str:
     head("House edge / RTP")
     lines.append(f"  estimated c       : {est['c_hat']:.4f}  "
                  f"(95% CI {est['c_lo']:.4f} – {est['c_hi']:.4f})")
-    lines.append(f"  implied RTP       : {est['c_hat']:.2%}")
+    suffix = "   <-- too few rounds to trust" if n < MIN_USEFUL_ROUNDS else ""
+    lines.append(f"  implied RTP       : {est['c_hat']:.2%}{suffix}")
     lines.append(f"  implied edge      : {1 - est['c_hat']:.2%}")
     lines.append(f"  game claims RTP   : {claimed:.2%}")
     consistent = est["c_lo"] <= claimed <= est["c_hi"]
