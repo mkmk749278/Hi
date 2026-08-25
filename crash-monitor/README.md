@@ -76,10 +76,22 @@ python -m crashmon.collector --db crash.sqlite3 # collect
 
 ## The report
 
+After a systemd install, `crashmon-report` wraps this up with the right
+interpreter and database already filled in:
+
 ```bash
-python -m crashmon.analyze --db /var/lib/crash-monitor/crash.sqlite3
-python -m crashmon.analyze --db … --json        # machine-readable
-python -m crashmon.analyze --db … --thresholds 1.5,2,5,50
+crashmon-report
+crashmon-report --json                  # machine-readable
+crashmon-report --thresholds 1.5,2,5,50
+```
+
+Running the module directly works too, but `python -m` resolves the package
+from the current directory, so name it explicitly rather than relying on where
+you happen to be standing:
+
+```bash
+PYTHONPATH=/opt/crash-monitor /opt/crash-monitor/venv/bin/python \
+    -m crashmon.analyze --db /var/lib/crash-monitor/crash.sqlite3
 ```
 
 It prints the sample summary, the fairness verification, the threshold table
