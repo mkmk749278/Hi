@@ -68,11 +68,21 @@ cp -r "$SRC_DIR/crashmon" "$APP_DIR/crashmon"
 cp "$SRC_DIR/requirements.txt" "$APP_DIR/"
 
 echo "==> creating virtualenv"
-if [[ ! -x "$APP_DIR/venv/bin/python" ]]; then
+# A run that died inside ensurepip leaves a venv skeleton holding an
+# interpreter but no pip, so testing only for bin/python would treat that
+# wreckage as a usable environment and fail later on a missing pip. Require
+# both, and rebuild from scratch when either is absent.
+if [[ ! -x "$APP_DIR/venv/bin/python" || ! -x "$APP_DIR/venv/bin/pip" ]]; then
+    rm -rf "${APP_DIR:?}/venv"
     if ! python3 -m venv "$APP_DIR/venv"; then
-        echo "error: virtualenv creation failed. Remove $APP_DIR/venv and re-run." >&2
+        echo "error: virtualenv creation failed in $APP_DIR/venv." >&2
         exit 1
     fi
+fi
+if [[ ! -x "$APP_DIR/venv/bin/pip" ]]; then
+    echo "error: virtualenv has no pip even after a clean rebuild." >&2
+    echo "       check that python3 -m ensurepip works on this host." >&2
+    exit 1
 fi
 "$APP_DIR/venv/bin/pip" install --quiet --upgrade pip
 "$APP_DIR/venv/bin/pip" install --quiet -r "$APP_DIR/requirements.txt"
