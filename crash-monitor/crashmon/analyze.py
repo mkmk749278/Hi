@@ -29,7 +29,7 @@ import json
 import math
 import sqlite3
 
-from . import db
+from . import db, streaks
 
 DEFAULT_THRESHOLDS = [1.2, 1.5, 2.0, 3.0, 5.0, 10.0, 20.0, 50.0, 100.0]
 PUBLISHED_RTP = 0.97
@@ -84,10 +84,12 @@ def load(conn: sqlite3.Connection) -> dict:
         "WHERE crash IS NOT NULL ORDER BY ended_at"
     ).fetchall()
     crashes = [float(r["crash"]) for r in rows]
+    series = [(float(r["crash"]), r["ended_at"]) for r in rows]
     stamps = [r["ended_at"] for r in rows if r["ended_at"]]
     verified = [r["verified"] for r in rows]
     return {
         "crashes": crashes,
+        "series": series,
         "n": len(crashes),
         "first": stamps[0] if stamps else None,
         "last": stamps[-1] if stamps else None,
@@ -159,10 +161,16 @@ def analyse(data: dict, thresholds: list[float]) -> dict:
     lowest = min(crashes)
     at_lowest = sum(1 for c in crashes if abs(c - lowest) < 1e-9)
 
+    segs = streaks.segment(data.get("series") or [(c, None) for c in crashes])
+    streak_thresholds = [t for t in (2.0, 5.0) if t in thresholds] or [2.0]
+
     return {
         **data,
         "empty": False,
         "table": threshold_table(crashes, thresholds),
+        "streaks": [streaks.analyse_threshold(segs, t, c_est["c_hat"] or PUBLISHED_RTP)
+                    for t in streak_thresholds],
+        "gaps": len(segs) - 1,
         "estimate": c_est,
         "fit": fit,
         "max": max(crashes),
@@ -262,10 +270,37 @@ def render(result: dict) -> str:
     lines.append("  note: the maximum grows in proportion to how long you watch —")
     lines.append("  it measures observation time, not a property of the game.")
 
+    for st in result.get("streaks", []):
+        head(f"Consecutive rounds below {st['threshold']:.0f}x")
+        lines.append(f"  each round falls below : {st['p_below']:.2%}")
+        lines.append(f"  longest run observed   : {st['longest']:,}")
+        if st["expected_longest"]:
+            lines.append(f"  expected longest       : ~{st['expected_longest']:.1f}"
+                         f"  (over {st['n']:,} rounds)")
+        lines.append(f"  runs seen              : {st['runs']:,}"
+                     f"  (mean length {st['mean_run']:.2f})")
+        if st["segments"] > 1:
+            lines.append(f"  note: {st['segments']} collection segments — runs are not")
+            lines.append(f"        counted across gaps where rounds were missed.")
+        lines.append("")
+        lines.append("     run       chance of        observed   expected")
+        lines.append("   length      starting          count      count")
+        for b in st["buckets"]:
+            if b["expected"] < 0.005 and b["observed"] == 0:
+                continue
+            odds = f"1 in {1/b['probability']:,.0f}" if b["probability"] > 0 else "-"
+            lines.append(f"   >= {b['k']:>3}    {odds:>16}   {b['observed']:>8,}"
+                         f"   {b['expected']:>8.2f}")
+
     head("Reminder")
     lines.append("  Rounds are independent draws. Nothing above predicts the next")
     lines.append("  round, and no cash-out target changes the expected return, which")
     lines.append(f"  is c = {est['c_hat']:.2%} regardless of strategy.")
+    lines.append("")
+    lines.append("  This applies to streaks in particular. After any number of")
+    lines.append("  consecutive low rounds, the next round carries exactly the same")
+    lines.append("  probability as the first. A long run is not a debt the game")
+    lines.append("  repays; the streak table above shows how ordinary long runs are.")
     lines.append("")
     return "\n".join(lines)
 

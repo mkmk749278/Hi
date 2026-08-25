@@ -112,6 +112,50 @@ Rounds are independent, so a *random subsample* is as good as a contiguous one �
 if the VPS is down for a while, the data stays valid. The `uptime` table records
 exactly when the collector was connected, so gaps are visible rather than assumed.
 
+## Streaks
+
+The report includes run-length analysis for below-2x and below-5x: longest run
+observed, how many runs of each length occurred, and how many the model expects.
+
+Under `P(X >= x) = c/x`, a round falls below `t` with probability `p = 1 - c/t`
+independently of every other round, so a run of `k` has probability `p**k`. At the
+advertised 97% RTP, below-2x has `p = 0.515`:
+
+| Run of | Chance of starting | Expect per day (~4,300 rounds) |
+|---|---|---|
+| 5 | 1 in 28 | ~76 |
+| 7 | 1 in 104 | ~20 |
+| 10 | 1 in 762 | ~2.7 |
+| 12 | 1 in 2,873 | ~0.7 |
+| 15 | 1 in 21,033 | ~0.1 |
+| 20 | 1 in 580,571 | once every ~9 months |
+
+The longest run grows only *logarithmically* with how long you watch:
+
+| Watching | Expected longest below-2x run |
+|---|---|
+| 1 hour | ~7 |
+| 1 day | ~11–12 |
+| 1 week | ~14–15 |
+| 1 month | ~17 |
+
+Below 5x the runs are far longer, because `p = 0.806`: expect a longest run
+around 31 in a day and around 47 in a month.
+
+So a streak of a dozen below 2x is not a glitch or a rigged patch — it is a
+roughly daily event. **And it is not predictive.** After twelve consecutive
+losses the next round is still 51.5% to fall below 2x, because the crash point
+was committed to a hashed seed before the round opened. There is no debt and no
+correction due. Doubling after losses (martingale) does not escape this either:
+it converts many small wins into a rare catastrophic loss with the same expected
+return, `c`, and the game enforces a maximum bet that caps the doubling well
+before the streak does.
+
+Streaks are never counted across a collection gap. If the collector was
+disconnected, two adjacent rows are not adjacent rounds, and joining them would
+invent runs that never happened — so the sequence is split wherever the spacing
+implies a missed round, and the report says how many segments it used.
+
 ## Reading the results honestly
 
 **The maximum is not a property of the game.** The tail is `1/x` and unbounded,
