@@ -1,0 +1,41 @@
+[Unit]
+Description=1win crash round-history collector
+Documentation=https://github.com/mkmk749278/hi/tree/main/crash-monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=crashmon
+Group=crashmon
+WorkingDirectory=/opt/crash-monitor
+Environment=CRASHMON_DB=/var/lib/crash-monitor/crash.sqlite3
+ExecStart=/opt/crash-monitor/venv/bin/python -m crashmon.collector
+Restart=always
+RestartSec=10s
+# The collector reconnects internally; this is the backstop for a hard crash.
+StartLimitIntervalSec=0
+
+# It needs outbound HTTPS and its own database, nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/crash-monitor
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=crash-monitor
+
+[Install]
+WantedBy=multi-user.target
