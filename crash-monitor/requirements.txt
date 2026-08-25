@@ -1,0 +1,2 @@
+# Only one third-party dependency; everything else is stdlib.
+websockets>=14.0
