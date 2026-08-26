@@ -29,11 +29,21 @@ POST <gateway>/user/token  Session-Id/Customer-Id -> Centrifugo JWT for channel 
 wss://<gateway>/websocket/lifecycle               -> the live round stream
 ```
 
-`crash-97` is the **global** round channel. Two independently created demo
-sessions were confirmed to receive identical round ids and identical crash
-values, 12 samples out of 12 — so demo mode is a read credential, not a separate
-sandbox RNG. **The multipliers recorded here are the same ones real-money players
-receive.**
+`crash-97` is the **global** round channel, confirmed two ways:
+
+- Two independently created demo sessions receive identical round ids and
+  identical crash values, 12 samples out of 12. So demo mode is not a per-user
+  sandbox.
+- More decisively, real-money bets appear on the very rounds a demo session
+  reads. `history/last` returns the round's bets, and they carry real currencies
+  and real account ids — e.g. a round crashing at 1.86x carried bets of 1019 VES
+  (US$1.30) and 20 VES from numeric user ids like `45242093`, structurally unlike
+  the demo user's UUID. One of those players cashed out at 1.7x and was paid,
+  because 1.7 < 1.86.
+
+Demo mode is therefore a read credential with play-money chips attached, not a
+separate RNG. **The multipliers recorded here are the exact ones deciding whether
+real players' money pays out.**
 
 ## Why a websocket and not polling
 
