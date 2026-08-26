@@ -305,6 +305,43 @@ def render(result: dict) -> str:
     return "\n".join(lines)
 
 
+def render_recent(conn: sqlite3.Connection, limit: int) -> str:
+    """The last N rounds, newest first, for comparison against the live game."""
+    rows = conn.execute(
+        "SELECT round_id, crash, ended_at, verified FROM rounds "
+        "WHERE ended_at IS NOT NULL ORDER BY ended_at DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+    if not rows:
+        return "No rounds collected yet."
+
+    lines = [f"Last {len(rows)} rounds (newest first)",
+             "-" * (len(f"Last {len(rows)} rounds (newest first)")), ""]
+    lines.append("      time (UTC)      crash    hash   round id")
+    for r in rows:
+        stamp = (r["ended_at"] or "")[11:19]
+        mark = {1: "ok", 0: "BAD"}.get(r["verified"], "-")
+        lines.append(f"   {stamp:>12}   {r['crash']:>7.2f}x   {mark:>4}   {r['round_id'][:8]}")
+
+    lines.append("")
+    lines.append("Compare this row against the game's own history strip:")
+    lines.append("")
+    row = "  ".join(f"{r['crash']:.2f}" for r in rows)
+    # Wrap the compact row so it stays readable in a narrow terminal.
+    width, line = 72, "  "
+    for token in row.split("  "):
+        if len(line) + len(token) + 2 > width:
+            lines.append(line)
+            line = "  "
+        line += token + "  "
+    if line.strip():
+        lines.append(line)
+    lines.append("")
+    lines.append("  (newest first — most game UIs show the newest on the left too,")
+    lines.append("   but check which end yours starts from before comparing.)")
+    return "\n".join(lines)
+
+
 def main(argv: list[str] | None = None) -> int:
     from . import config
     parser = argparse.ArgumentParser(description="Analyse collected crash rounds.")
@@ -312,6 +349,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true", help="emit raw JSON instead")
     parser.add_argument("--thresholds", type=str, default=None,
                         help="comma-separated, e.g. 2,5,10")
+    parser.add_argument("--recent", type=int, metavar="N", default=None,
+                        help="show the last N rounds instead of the full report")
     args = parser.parse_args(argv)
 
     thresholds = DEFAULT_THRESHOLDS
@@ -319,6 +358,9 @@ def main(argv: list[str] | None = None) -> int:
         thresholds = [float(t) for t in args.thresholds.split(",") if t.strip()]
 
     conn = db.connect(args.db)
+    if args.recent:
+        print(render_recent(conn, max(1, args.recent)))
+        return 0
     result = analyse(load(conn), thresholds)
     if args.json:
         result.pop("crashes", None)

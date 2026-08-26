@@ -86,6 +86,22 @@ python -m crashmon.collector --db crash.sqlite3 # collect
 
 ## The report
 
+### Comparing against the live game
+
+To check the collector against what the game itself shows, print the most recent
+rounds and hold them up against the game's own history strip:
+
+```bash
+crashmon-recent          # last 20
+crashmon-recent 10       # last 10
+```
+
+It prints a timestamped table with each round's verification status, then the
+same multipliers as one compact row for eyeballing. Newest first — check which
+end the game's strip starts from before comparing.
+
+### The full report
+
 After a systemd install, `crashmon-report` wraps this up with the right
 interpreter and database already filled in:
 
