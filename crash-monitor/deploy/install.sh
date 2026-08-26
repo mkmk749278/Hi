@@ -110,6 +110,15 @@ exec env PYTHONPATH="$APP_DIR" "$APP_DIR/venv/bin/python" -m crashmon.analyze \\
 WRAPPER
 chmod 0755 /usr/local/bin/crashmon-report
 
+cat > /usr/local/bin/crashmon-recent <<WRAPPER
+#!/bin/sh
+# Show the most recent rounds for comparison against the live game.
+# Defaults to 20; pass a count to override, e.g. crashmon-recent 10
+exec env PYTHONPATH="$APP_DIR" "$APP_DIR/venv/bin/python" -m crashmon.analyze \\
+    --db "$DATA_DIR/crash.sqlite3" --recent "\${1:-20}"
+WRAPPER
+chmod 0755 /usr/local/bin/crashmon-recent
+
 echo "==> installing systemd unit"
 install -m 0644 "$SRC_DIR/deploy/$SERVICE.service" "/etc/systemd/system/$SERVICE.service"
 systemctl daemon-reload
@@ -126,6 +135,7 @@ Installed.
   logs      journalctl -u $SERVICE -f
   database  $DATA_DIR/crash.sqlite3
   report    crashmon-report
+  recent    crashmon-recent [count]
 
 At roughly 20s per round expect about 4,300 rounds a day; a day is already
 enough to pin the below-2x rate to well under a percentage point.

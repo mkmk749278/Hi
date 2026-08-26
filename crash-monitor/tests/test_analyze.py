@@ -70,3 +70,47 @@ def test_ks_uniform_on_uniform_data():
 
 def test_render_handles_empty_database():
     assert "No rounds" in analyze.render({"empty": True})
+
+
+def _db_with(rows):
+    """In-memory database holding the given (crash, ended_at, verified) rows."""
+    from crashmon import db
+    conn = db.connect(":memory:")
+    for i, (crash, ended_at, verified) in enumerate(rows):
+        db.insert_round(conn, {
+            "round_id": f"{i:08d}-0000-0000-0000-000000000000",
+            "crash": crash, "final_values": None, "started_at": ended_at,
+            "ended_at": ended_at, "rtp": 0.97, "algorithm": "SHA512",
+            "hash": None, "salt": None, "check_string": None,
+            "verified": verified, "anomaly": None,
+        })
+    return conn
+
+
+def test_recent_is_newest_first_and_limited():
+    conn = _db_with([
+        (1.10, "2026-08-25T12:00:00+00:00", 1),
+        (2.20, "2026-08-25T12:00:20+00:00", 1),
+        (3.30, "2026-08-25T12:00:40+00:00", 1),
+    ])
+    out = analyze.render_recent(conn, 2)
+    lines = [l for l in out.splitlines() if "x  " in l or "x " in l]
+    # Newest (3.30) must appear before 2.20, and 1.10 must be excluded.
+    assert out.index("3.30") < out.index("2.20")
+    assert "1.10" not in out
+
+
+def test_recent_marks_a_failed_verification():
+    conn = _db_with([(1.50, "2026-08-25T12:00:00+00:00", 0)])
+    assert "BAD" in analyze.render_recent(conn, 5)
+
+
+def test_recent_handles_empty_database():
+    conn = _db_with([])
+    assert "No rounds" in analyze.render_recent(conn, 10)
+
+
+def test_recent_asking_for_more_than_exists():
+    conn = _db_with([(1.50, "2026-08-25T12:00:00+00:00", 1)])
+    out = analyze.render_recent(conn, 50)
+    assert "Last 1 rounds" in out
